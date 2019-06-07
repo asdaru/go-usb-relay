@@ -106,7 +106,7 @@ func (r *Relay) onOff(n int, isOn bool) (err error) {
 		}
 	}
 	err = r.dev.SetReport(0, buf)
-	return
+	return err
 }
 
 func (r *Relay) Toggle(n int) (err error) {
@@ -122,8 +122,9 @@ func (r *Relay) Close() {
 	r.dev.Close()
 }
 
-func ListAll() (ret map[string]*Relay) {
-	ret = map[string]*Relay{}
+func ListAll() (map[string]*Relay, error) {
+	ret := map[string]*Relay{}
+	var err error
 	var lock sync.Mutex
 
 	hid.UsbWalk(func(device hid.Device) {
@@ -132,21 +133,23 @@ func ListAll() (ret map[string]*Relay) {
 		if pid != "16c0:05df" {
 			return
 		}
-		if err := device.Open(); err != nil {
+		if err = device.Open(); err != nil {
 			return
 		}
-		var (
-			id  string
-			err error
-		)
+		var id string
+
 		r := &Relay{dev: device}
-		if id, err = r.Id(); err != nil || id == "" {
+
+		if id, err = r.Id(); err != nil {
 			return
+		}
+		if id == "" {
+			id = fmt.Sprintf("%04x:%04x:%04x:%02x", info.Vendor, info.Product, info.Revision, info.Interface)
 		}
 		lock.Lock()
 		defer lock.Unlock()
 		ret[id] = r
 		return
 	})
-	return ret
+	return ret, err
 }
